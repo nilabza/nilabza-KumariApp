@@ -23,7 +23,6 @@ const App: React.FC = () => {
     age: 13,
     location: 'rural',
   });
-
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [consent, setConsent] = useState<boolean | null>(null);
