@@ -86,7 +86,7 @@ If you want to use the live phone call feature, follow these additional steps.
     ```
 4.  **COPY the `https://...` URL.** This is your public backend address.
 
-### Connecting Twilio for Real Calls
+### Connecting Twilio for Real Calls [not currently implemented]
 
 1.  Go to your Twilio phone number's configuration page.
 2.  Under "Voice" -> "A CALL COMES IN", select "Webhook".
