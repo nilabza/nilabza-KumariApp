@@ -67,7 +67,7 @@ DATABASE_URL="mysql+mysqlconnector://root:mysecretpassword@localhost:3306/kumari
 
 ---
 
-## 📞 (Optional) Telephony Setup with Twilio & ngrok
+## 📞 (Optional) Telephony Setup with Twilio & ngrok- this is not implemented yet
 
 If you want to use the live phone call feature, follow these additional steps.
 
