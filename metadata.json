@@ -1,0 +1,7 @@
+{
+  "name": "KUMARI -Adolescent Health App ",
+  "description": "An AI-powered chatbot designed to provide health guidance to adolescent girls, based on the advanced scenario from the system interaction flow document. It features a user-friendly chat interface with text and voice input capabilities.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
