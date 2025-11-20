@@ -5,6 +5,7 @@ import { getChatbotResponse, detectLanguage } from './services/geminiService';
 import { retrieveContext as getContextForQuery } from './services/knowledgeBase';
 import { getRandomProbingQuestion } from './services/probingQuestions';
 import ChatInterface from './components/ChatInterface';
+import Onboarding from './components/Onboarding';
 import { useTextToSpeech } from './hooks/useTextToSpeech';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import Auth from './components/Auth';
@@ -35,6 +36,7 @@ const App: React.FC = () => {
   const [consecutiveSpeechFailures, setConsecutiveSpeechFailures] = useState(0);
   const [currentLangCode, setCurrentLangCode] = useState('en-IN');
   const [isSystemReady, setIsSystemReady] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   
   const [inputValue, setInputValue] = useState('');
   const [micError, setMicError] = useState('');
@@ -81,12 +83,27 @@ const App: React.FC = () => {
     const loggedInUser = localStorage.getItem('currentUser');
     if (loggedInUser) {
       setCurrentUser(loggedInUser);
+      const hasSeenOnboarding = localStorage.getItem(`onboarding_completed_${loggedInUser}`);
+      if (!hasSeenOnboarding) {
+        setShowOnboarding(true);
+      }
     }
   }, []);
   
   const handleAuthSuccess = (phoneNumber: string) => {
     localStorage.setItem('currentUser', phoneNumber);
     setCurrentUser(phoneNumber);
+    const hasSeenOnboarding = localStorage.getItem(`onboarding_completed_${phoneNumber}`);
+    if (!hasSeenOnboarding) {
+        setShowOnboarding(true);
+    }
+  };
+
+  const handleOnboardingComplete = () => {
+    if (currentUser) {
+        localStorage.setItem(`onboarding_completed_${currentUser}`, 'true');
+    }
+    setShowOnboarding(false);
   };
   
   const handleLogout = () => {
@@ -99,6 +116,7 @@ const App: React.FC = () => {
     setConsent(null);
     setIsWorkerMode(false);
     setIsSystemReady(false);
+    setShowOnboarding(false);
     resetCall();
   };
 
@@ -432,16 +450,26 @@ const App: React.FC = () => {
 
   if (!currentUser) {
     return (
-      <div className="flex justify-center items-center h-screen font-sans">
+      <div className="flex justify-center items-center h-screen font-sans bg-slate-50">
         <div className="w-full max-w-lg h-full md:h-[90vh] md:max-h-[800px] bg-white rounded-lg shadow-2xl flex flex-col">
           <Auth onAuthSuccess={handleAuthSuccess} />
         </div>
       </div>
     );
   }
+  
+  if (showOnboarding) {
+    return (
+        <div className="flex justify-center items-center h-screen font-sans bg-slate-50">
+            <div className="w-full max-w-lg h-full md:h-[90vh] md:max-h-[800px] bg-white rounded-lg shadow-2xl flex flex-col">
+                <Onboarding onComplete={handleOnboardingComplete} />
+            </div>
+        </div>
+    );
+  }
 
   return (
-    <div className="flex justify-center items-center h-screen font-sans">
+    <div className="flex justify-center items-center h-screen font-sans bg-slate-50">
         <div className="w-full max-w-lg h-full md:h-[90vh] md:max-h-[800px] bg-white rounded-lg shadow-2xl flex flex-col">
             <ChatInterface
                 messages={messages}
