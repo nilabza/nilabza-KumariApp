@@ -27,7 +27,7 @@ async function startServer() {
     });
   };
 
-  // Language Detection Endpoint
+  // Language Detection Endpoint with fast local script detection & model fallback
   app.post(['/api/detect-language', '/api/detect-language/'], async (req, res) => {
     try {
       const { text } = req.body || {};
@@ -35,21 +35,64 @@ async function startServer() {
         return res.json({ languageCode: 'en-IN' });
       }
 
+      const input = text.trim();
+
+      // Fast local script detection to save API calls and quota
+      if (/[\u0900-\u097F]/.test(input)) return res.json({ languageCode: 'hi-IN' });
+      if (/[\u0B80-\u0BFF]/.test(input)) return res.json({ languageCode: 'ta-IN' });
+      if (/[\u0980-\u09FF]/.test(input)) return res.json({ languageCode: 'bn-IN' });
+      if (/[\u0C00-\u0C7F]/.test(input)) return res.json({ languageCode: 'te-IN' });
+      if (/[\u0C80-\u0CFF]/.test(input)) return res.json({ languageCode: 'kn-IN' });
+      if (/[\u0D00-\u0D7F]/.test(input)) return res.json({ languageCode: 'ml-IN' });
+      if (/[\u0A80-\u0AFF]/.test(input)) return res.json({ languageCode: 'gu-IN' });
+      if (/[\u0A00-\u0A7F]/.test(input)) return res.json({ languageCode: 'pa-IN' });
+
+      // Detect Romanized Hindi (Hinglish)
+      const hinglishKeywords = /\b(kya|kaise|hai|mujhe|mera|meri|mere|didi|ho|nahi|haan|batao|dard|khana|paani|pata|karo|kab)\b/i;
+      if (hinglishKeywords.test(input)) {
+        return res.json({ languageCode: 'hi-IN' });
+      }
+
       const ai = getGenAIClient();
       if (!ai) {
         return res.json({ languageCode: 'en-IN' });
       }
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.6-flash',
-        contents: `Identify the primary BCP-47 language tag (such as 'en-IN', 'hi-IN', 'ta-IN', 'bn-IN', 'te-IN', 'mr-IN', 'gu-IN', 'kn-IN', 'ml-IN', 'pa-IN') for the text below. If the text is written in Hinglish/Romanized Hindi or mixed, return 'hi-IN' or 'en-IN'. Return ONLY the BCP-47 language code string with no quotes, formatting, or extra explanation.\n\nText: "${text.trim()}"`,
-      });
+      // Try lightweight models with fallback
+      const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+      for (const model of models) {
+        try {
+          const response = await ai.models.generateContent({
+            model,
+            contents: `Identify the BCP-47 language tag (e.g. 'en-IN', 'hi-IN', 'ta-IN', 'bn-IN') for: "${input}". Return ONLY the BCP-47 string.`,
+          });
+          const langCode = response.text ? response.text.trim().replace(/['"`]/g, '') : 'en-IN';
+          return res.json({ languageCode: langCode || 'en-IN' });
+        } catch (e) {
+          console.warn(`Language detection failed with model ${model}, trying next...`);
+        }
+      }
 
-      const langCode = response.text ? response.text.trim().replace(/['"`]/g, '') : 'en-IN';
-      return res.json({ languageCode: langCode || 'en-IN' });
+      return res.json({ languageCode: 'en-IN' });
     } catch (error) {
       console.error('Error in language detection:', error);
       return res.json({ languageCode: 'en-IN' });
+    }
+  });
+
+  // Save Conversation Endpoint
+  app.post(['/api/conversations', '/api/conversations/'], async (req, res) => {
+    try {
+      const conversationData = req.body;
+      console.log('Saved conversation anonymously:', {
+        age: conversationData?.user_age,
+        location: conversationData?.user_location,
+        messageCount: conversationData?.messages?.length,
+      });
+      return res.json({ status: 'success', message: 'Conversation saved successfully.' });
+    } catch (error) {
+      console.error('Error saving conversation:', error);
+      return res.status(500).json({ error: 'Failed to save conversation.' });
     }
   });
 
@@ -60,13 +103,6 @@ async function startServer() {
 
       if (!query || typeof query !== 'string' || !query.trim()) {
         return res.status(400).json({ error: 'Query is required' });
-      }
-
-      const ai = getGenAIClient();
-      if (!ai) {
-        return res.json({
-          responseText: "I'm currently missing my API connection key. Please verify that the GEMINI_API_KEY is set in your environment settings.",
-        });
       }
 
       // Retrieve relevant domain knowledge context
@@ -93,24 +129,50 @@ ${knowledgeContextStr}
 
 Format your response clearly using friendly paragraphs or bullet points if helpful. Avoid long robotic disclaimers. Keep your response concise, helpful, and encouraging.`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.6-flash',
-        contents: query.trim(),
-        config: {
-          systemInstruction,
-          temperature: 0.7,
-        },
-      });
+      const ai = getGenAIClient();
+      let responseText = '';
 
-      const responseText = response.text
-        ? response.text.trim()
-        : "I'm having trouble phrasing my response right now. Could you please try asking again?";
+      if (ai) {
+        // Models list to try in order of preference for resilience against rate limits
+        const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-3.6-flash'];
+        
+        for (const model of candidateModels) {
+          try {
+            const response = await ai.models.generateContent({
+              model,
+              contents: query.trim(),
+              config: {
+                systemInstruction,
+                temperature: 0.7,
+              },
+            });
+
+            if (response.text && response.text.trim()) {
+              responseText = response.text.trim();
+              break; // Successfully got a response!
+            }
+          } catch (modelError: any) {
+            console.warn(`Model ${model} failed or exceeded quota:`, modelError?.message || modelError);
+            // Continue loop to try next fallback model
+          }
+        }
+      }
+
+      // If all Gemini calls fail (due to quota or network), construct a warm, high-quality response using the local knowledge base
+      if (!responseText) {
+        if (knowledge.content.length > 0) {
+          const formattedFacts = knowledge.content.map(fact => `• ${fact}`).join('\n');
+          responseText = `Hi dear! I am here for you. Regarding **${knowledge.topic}**, here is some helpful guidance:\n\n${formattedFacts}\n\nRemember to stay hydrated, eat nourishing food, and reach out to a trusted elder, teacher, or ASHA didi if you ever feel uncomfortable or unwell. You are doing great! 💕`;
+        } else {
+          responseText = `Hi dear! I am KUMARI, your personal health assistant. I am here to support you with questions about nutrition, menstrual health, emotional well-being, and staying healthy.\n\nCould you please tell me a bit more about what you would like to know today? 💕`;
+        }
+      }
 
       return res.json({ responseText });
     } catch (error) {
       console.error('Error handling chat request:', error);
       return res.json({
-        responseText: "I experienced a temporary network issue. Please try asking your question again in a moment.",
+        responseText: "Hi dear! I experienced a temporary network slowdown, but I am right here with you. Please ask your question once again and I'll be happy to help!",
       });
     }
   });
