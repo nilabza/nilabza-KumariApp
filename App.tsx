@@ -44,9 +44,9 @@ const App: React.FC = () => {
 
   const { speak, cancel, isSpeaking, primeTTS } = useTextToSpeech();
 
-  const handleFinalTranscriptRef = useRef<(transcript: string) => void>();
-  const handleInterimTranscriptRef = useRef<(transcript: string) => void>();
-  const handleRecognitionErrorRef = useRef<(error: string) => void>();
+  const handleFinalTranscriptRef = useRef<((transcript: string) => void) | null>(null);
+  const handleInterimTranscriptRef = useRef<((transcript: string) => void) | null>(null);
+  const handleRecognitionErrorRef = useRef<((error: string) => void) | null>(null);
   
   // FIX: The callback must accept a 'transcript' argument to match the signature expected by useSpeechRecognition.
   const onFinalTranscript = useCallback((transcript: string) => {

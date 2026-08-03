@@ -49,6 +49,6 @@ export const getChatbotResponse = async (query: string, userProfile: UserProfile
         return data.responseText;
     } catch (error) {
         console.error("Error fetching response from backend API:", error);
-        return "I'm having a little trouble connecting to my brain right now. Please try asking me again in a moment.";
+        return "I'm having a little trouble connecting right now. Please try asking me again in a moment.";
     }
 };
