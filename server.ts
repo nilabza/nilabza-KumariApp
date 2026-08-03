@@ -37,18 +37,18 @@ async function startServer() {
 
       const input = text.trim();
 
-      // Fast local script detection to save API calls and quota
-      if (/[\u0900-\u097F]/.test(input)) return res.json({ languageCode: 'hi-IN' });
-      if (/[\u0B80-\u0BFF]/.test(input)) return res.json({ languageCode: 'ta-IN' });
-      if (/[\u0980-\u09FF]/.test(input)) return res.json({ languageCode: 'bn-IN' });
-      if (/[\u0C00-\u0C7F]/.test(input)) return res.json({ languageCode: 'te-IN' });
-      if (/[\u0C80-\u0CFF]/.test(input)) return res.json({ languageCode: 'kn-IN' });
-      if (/[\u0D00-\u0D7F]/.test(input)) return res.json({ languageCode: 'ml-IN' });
-      if (/[\u0A80-\u0AFF]/.test(input)) return res.json({ languageCode: 'gu-IN' });
-      if (/[\u0A00-\u0A7F]/.test(input)) return res.json({ languageCode: 'pa-IN' });
+      // Fast local script detection to save API calls and avoid quota depletion
+      if (/[\u0980-\u09FF]/.test(input)) return res.json({ languageCode: 'bn-IN' }); // Bengali
+      if (/[\u0900-\u097F]/.test(input)) return res.json({ languageCode: 'hi-IN' }); // Devanagari / Hindi
+      if (/[\u0B80-\u0BFF]/.test(input)) return res.json({ languageCode: 'ta-IN' }); // Tamil
+      if (/[\u0C00-\u0C7F]/.test(input)) return res.json({ languageCode: 'te-IN' }); // Telugu
+      if (/[\u0C80-\u0CFF]/.test(input)) return res.json({ languageCode: 'kn-IN' }); // Kannada
+      if (/[\u0D00-\u0D7F]/.test(input)) return res.json({ languageCode: 'ml-IN' }); // Malayalam
+      if (/[\u0A80-\u0AFF]/.test(input)) return res.json({ languageCode: 'gu-IN' }); // Gujarati
+      if (/[\u0A00-\u0A7F]/.test(input)) return res.json({ languageCode: 'pa-IN' }); // Punjabi
 
       // Detect Romanized Hindi (Hinglish)
-      const hinglishKeywords = /\b(kya|kaise|hai|mujhe|mera|meri|mere|didi|ho|nahi|haan|batao|dard|khana|paani|pata|karo|kab)\b/i;
+      const hinglishKeywords = /\b(kya|kaise|hai|mujhe|mera|meri|mere|didi|ho|nahi|haan|batao|dard|khana|paani|pata|karo|kab|karan)\b/i;
       if (hinglishKeywords.test(input)) {
         return res.json({ languageCode: 'hi-IN' });
       }
@@ -58,18 +58,20 @@ async function startServer() {
         return res.json({ languageCode: 'en-IN' });
       }
 
-      // Try lightweight models with fallback
-      const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+      // Try valid models with fallback
+      const models = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
       for (const model of models) {
         try {
           const response = await ai.models.generateContent({
             model,
-            contents: `Identify the BCP-47 language tag (e.g. 'en-IN', 'hi-IN', 'ta-IN', 'bn-IN') for: "${input}". Return ONLY the BCP-47 string.`,
+            contents: `Identify the primary BCP-47 language tag (such as 'en-IN', 'hi-IN', 'ta-IN', 'bn-IN', 'te-IN', 'mr-IN', 'gu-IN', 'kn-IN', 'ml-IN', 'pa-IN') for: "${input}". Return ONLY the BCP-47 code string with no extra quotes or explanation.`,
           });
           const langCode = response.text ? response.text.trim().replace(/['"`]/g, '') : 'en-IN';
-          return res.json({ languageCode: langCode || 'en-IN' });
-        } catch (e) {
-          console.warn(`Language detection failed with model ${model}, trying next...`);
+          if (langCode) {
+            return res.json({ languageCode: langCode });
+          }
+        } catch (e: any) {
+          console.warn(`Language detection failed with model ${model}:`, e?.message || e);
         }
       }
 
@@ -115,13 +117,31 @@ async function startServer() {
       const userLocation = userProfile?.location || 'rural';
       const userName = userProfile?.name ? ` User name is ${userProfile.name}.` : '';
 
+      const languageInstruction = langCode.startsWith('bn')
+        ? 'MUST respond fully in Bengali (বাংলা). Write naturally using Bengali script.'
+        : langCode.startsWith('hi')
+        ? 'MUST respond in Hindi (हिंदी) or natural Hinglish matching the user query.'
+        : langCode.startsWith('ta')
+        ? 'MUST respond in Tamil (தமிழ்).'
+        : langCode.startsWith('te')
+        ? 'MUST respond in Telugu (తెలుగు).'
+        : langCode.startsWith('kn')
+        ? 'MUST respond in Kannada (ಕನ್ನಡ).'
+        : langCode.startsWith('ml')
+        ? 'MUST respond in Malayalam (മലയാളം).'
+        : langCode.startsWith('mr')
+        ? 'MUST respond in Marathi (मराठी).'
+        : langCode.startsWith('gu')
+        ? 'MUST respond in Gujarati (ગુજરાતી).'
+        : `MUST respond in language/script code '${langCode}' (or the language/script used by the user in their query).`;
+
       const systemInstruction = `You are KUMARI, a compassionate, friendly, supportive, and culturally sensitive AI health & well-being assistant created specifically for adolescent girls in India${isWorkerMode ? ' and community health workers (ASHA didis)' : ''}.
 ${userName}
 Target audience profile: Adolescent girl (age ${userAge}, ${userLocation} area in India).
 
 Key Guidelines:
 1. Tone: Warm, empathetic, non-judgmental, reassuring, clear, and age-appropriate. Speak like a caring older sister or trusted guide ("Didi").
-2. Language: Respond in language/script code '${langCode}' (or the language/script used by the user in their query, e.g. Hindi, Hinglish, Tamil, Bengali, English).
+2. Language Rule: ${languageInstruction}
 3. Focus Areas: Menstrual health & hygiene, menstrual cramps management, balanced nutrition, anemia prevention (IFA tablets), emotional well-being & stress, preventing early child marriage, continuing education & career opportunities.
 4. Accuracy & Safety: Normalize bodily changes and periods. Give simple practical health steps. Encourage talking to trusted adults, teachers, or ASHA didis for severe pain or serious symptoms. Do not provide complex medical prescriptions or clinical diagnoses.
 ${isWorkerMode ? '5. Worker Mode Active: Provide clear, actionable facilitation advice and talking points that an ASHA didi or health worker can use to educate adolescent girls and counsel parents effectively.' : ''}
@@ -133,8 +153,8 @@ Format your response clearly using friendly paragraphs or bullet points if helpf
       let responseText = '';
 
       if (ai) {
-        // Models list to try in order of preference for resilience against rate limits
-        const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-3.6-flash'];
+        // Valid Gemini models in order of preference
+        const candidateModels = ['gemini-3.6-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
         
         for (const model of candidateModels) {
           try {
@@ -149,22 +169,38 @@ Format your response clearly using friendly paragraphs or bullet points if helpf
 
             if (response.text && response.text.trim()) {
               responseText = response.text.trim();
-              break; // Successfully got a response!
+              break; // Successfully generated response!
             }
           } catch (modelError: any) {
-            console.warn(`Model ${model} failed or exceeded quota:`, modelError?.message || modelError);
-            // Continue loop to try next fallback model
+            console.warn(`Model ${model} call failed:`, modelError?.message || modelError);
+            // Continue loop to try next model
           }
         }
       }
 
-      // If all Gemini calls fail (due to quota or network), construct a warm, high-quality response using the local knowledge base
+      // If all Gemini calls fail (e.g. rate limit / network error), construct a language-aware context-rich response
       if (!responseText) {
-        if (knowledge.content.length > 0) {
-          const formattedFacts = knowledge.content.map(fact => `• ${fact}`).join('\n');
-          responseText = `Hi dear! I am here for you. Regarding **${knowledge.topic}**, here is some helpful guidance:\n\n${formattedFacts}\n\nRemember to stay hydrated, eat nourishing food, and reach out to a trusted elder, teacher, or ASHA didi if you ever feel uncomfortable or unwell. You are doing great! 💕`;
+        if (langCode.startsWith('bn')) {
+          if (knowledge.content.length > 0) {
+            const formattedFacts = knowledge.content.map(fact => `• ${fact}`).join('\n');
+            responseText = `হ্যালো বোন! তোমার প্রশ্নের (${knowledge.topic}) বিষয়ে কিছু গুরুত্বপূর্ণ তথ্য নিচে দেওয়া হলো:\n\n${formattedFacts}\n\nপ্রচুর জল পান করো, ভালো খাবার খাও এবং প্রয়োজনে বড়দের বা আশা দিদির পরামর্শ নাও। 💕`;
+          } else {
+            responseText = `হ্যালো বোন! আমি কুমারী, তোমার স্বাস্থ্য সহায়িকা। পুষ্টি, পিরিয়ড স্বাস্থ্য, ও শারীরিক যত্ন নিয়ে যে কোনো প্রশ্ন আমাকে বলতে পারো। তোমার প্রশ্নটি আরেকটু বিশদে বলবে? 💕`;
+          }
+        } else if (langCode.startsWith('hi')) {
+          if (knowledge.content.length > 0) {
+            const formattedFacts = knowledge.content.map(fact => `• ${fact}`).join('\n');
+            responseText = `नमस्ते बहन! आपके सवाल (${knowledge.topic}) से जुड़ी कुछ ज़रूरी बातें:\n\n${formattedFacts}\n\nखूब पानी पीजिए, पौष्टिक खाना खाइए और ज़रूरत पड़ने पर आशा दीदी की सलाह लें। 💕`;
+          } else {
+            responseText = `नमस्ते बहन! मैं कुमारी, आपकी सेहत सहायिका हूँ। आप मुझसे पोषण, मासिक धर्म और सेहत से जुड़ा कोई भी सवाल पूछ सकती हैं। 💕`;
+          }
         } else {
-          responseText = `Hi dear! I am KUMARI, your personal health assistant. I am here to support you with questions about nutrition, menstrual health, emotional well-being, and staying healthy.\n\nCould you please tell me a bit more about what you would like to know today? 💕`;
+          if (knowledge.content.length > 0) {
+            const formattedFacts = knowledge.content.map(fact => `• ${fact}`).join('\n');
+            responseText = `Hi dear! Regarding **${knowledge.topic}**, here is some helpful guidance:\n\n${formattedFacts}\n\nRemember to stay hydrated, eat nourishing food, and reach out to an elder or ASHA didi if you feel unwell. 💕`;
+          } else {
+            responseText = `Hi dear! I am KUMARI, your personal health assistant. I am here to support you with nutrition, menstrual health, and well-being. What would you like to know today? 💕`;
+          }
         }
       }
 
@@ -172,7 +208,7 @@ Format your response clearly using friendly paragraphs or bullet points if helpf
     } catch (error) {
       console.error('Error handling chat request:', error);
       return res.json({
-        responseText: "Hi dear! I experienced a temporary network slowdown, but I am right here with you. Please ask your question once again and I'll be happy to help!",
+        responseText: "Hi dear! I experienced a temporary network issue. Please ask your question once again and I'll be happy to help!",
       });
     }
   });
