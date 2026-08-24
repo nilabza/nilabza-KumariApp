@@ -1,7 +1,7 @@
 # KUMARI - Adolescent Health Assistant
 https://ai.studio/apps/d7247f15-da1a-4c1b-901a-ff21757ae79a
 
-KUMARI is an AI-powered personal health assistant designed specifically to provide sensitive, culturally relevant, and accurate health and well-being guidance to adolescent girls in India, as well as community health workers (ASHA didis).
+KUMARI is an AI-powered personal health assistant designed specifically to provide sensitive, culturally relevant, and accurate health and well-being guidance to adolescent girls in Rural India, as well as community health workers (ASHA didis).
 
 ## Features
 
