@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect } from 'react';
-import { Message } from '../types';
-import { SendIcon, MicrophoneIcon, HeartIcon, WorkerIcon, PhoneIcon, PhoneHangUpIcon, LogoutIcon } from './icons';
+import { Message, SUPPORTED_LANGUAGES } from '../types';
+import { SendIcon, MicrophoneIcon, HeartIcon, WorkerIcon, PhoneIcon, PhoneHangUpIcon, LogoutIcon, GlobeIcon } from './icons';
 import ChatMessage from './ChatMessage';
 
 interface ChatInterfaceProps {
@@ -30,6 +30,8 @@ interface ChatInterfaceProps {
   inputValue: string;
   onInputChange: (value: string) => void;
   onLogout: () => void;
+  selectedLanguage: string;
+  onLanguageChange: (langCode: string) => void;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ 
@@ -37,7 +39,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   isWorkerMode, onToggleWorkerMode, onSimulateCall, onEndCall, callState,
   isVoiceModeActive, onStartVoiceMode, onEndVoiceMode, isSpeaking, isListening,
   isSystemReady, onPrepareSystem, hasSpeechRecognition, onToggleMicButton,
-  isMicButtonListening, micError, inputValue, onInputChange, onLogout
+  isMicButtonListening, micError, inputValue, onInputChange, onLogout,
+  selectedLanguage, onLanguageChange
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -74,34 +77,78 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     </div>
   );
 
+  const selectedLangObj = SUPPORTED_LANGUAGES.find(l => l.code === selectedLanguage) || SUPPORTED_LANGUAGES[0];
+
   return (
     <div className="flex flex-col h-full bg-slate-100">
-      <header className="bg-white border-b border-slate-200 p-4 flex items-center justify-between gap-3 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-pink-500 flex items-center justify-center">
-              <HeartIcon className="w-6 h-6 text-white"/>
-          </div>
-          <div>
-              <h1 className="text-lg font-bold text-slate-800">KUMARI Health Assistant</h1>
-              <p className="text-sm text-slate-500">{isWorkerMode ? 'Panchayat Worker Mode' : 'Your friendly guide for health questions'}</p>
-              {isWorkerMode && (
-                <div className="flex items-center gap-1.5 text-xs text-slate-600 mt-1">
-                    <div className={`w-2 h-2 rounded-full ${isSystemReady ? 'bg-green-500' : 'bg-slate-400'}`}></div>
-                    <span>Phone System: {isSystemReady ? 'Ready' : 'Offline'}</span>
-                    <span className="text-slate-300">|</span>
-                    <PhoneIcon className="w-3 h-3"/>
-                    <span>Line: 8170981154</span>
+      <header className="bg-white border-b border-slate-200 p-3 sm:p-4 flex flex-col gap-2.5 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-pink-500 flex-shrink-0 flex items-center justify-center shadow-sm">
+                <HeartIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white"/>
+            </div>
+            <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-base sm:text-lg font-bold text-slate-800 truncate">KUMARI Health</h1>
+                  {selectedLanguage !== 'auto' && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-pink-50 text-pink-700 border border-pink-200">
+                      {selectedLangObj.nativeLabel}
+                    </span>
+                  )}
                 </div>
-              )}
+                <p className="text-xs text-slate-500 truncate">
+                  {isWorkerMode ? 'Panchayat Worker Mode' : 'Adolescent health & well-being assistant'}
+                </p>
+                {isWorkerMode && (
+                  <div className="flex items-center gap-1.5 text-xs text-slate-600 mt-0.5">
+                      <div className={`w-2 h-2 rounded-full ${isSystemReady ? 'bg-green-500' : 'bg-slate-400'}`}></div>
+                      <span>Phone: {isSystemReady ? 'Ready' : 'Offline'}</span>
+                      <span className="text-slate-300">|</span>
+                      <PhoneIcon className="w-3 h-3"/>
+                      <span>Line: 8170981154</span>
+                  </div>
+                )}
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={onToggleWorkerMode} className={`p-2 rounded-full transition-colors ${isWorkerMode ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'}`} aria-label="Toggle Worker Mode">
-            <WorkerIcon className="w-5 h-5"/>
-          </button>
-          <button onClick={onLogout} className="p-2 rounded-full bg-slate-200 text-slate-600 hover:bg-red-100 hover:text-red-600 transition-colors" aria-label="Logout">
-            <LogoutIcon className="w-5 h-5"/>
-          </button>
+
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            {/* Language Selection Dropdown */}
+            <div className="relative flex items-center">
+              <div className="flex items-center bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-1.5 sm:py-1.5 transition-colors focus-within:ring-2 focus-within:ring-pink-500 focus-within:border-pink-500">
+                <GlobeIcon className="w-4 h-4 text-pink-600 mr-1.5 flex-shrink-0" />
+                <select
+                  id="language-select-dropdown"
+                  value={selectedLanguage}
+                  onChange={(e) => onLanguageChange(e.target.value)}
+                  className="bg-transparent text-xs font-semibold text-slate-700 cursor-pointer focus:outline-none pr-1"
+                  aria-label="Select response language"
+                >
+                  {SUPPORTED_LANGUAGES.map((lang) => (
+                    <option key={lang.code} value={lang.code} className="text-slate-800 bg-white">
+                      {lang.code === 'auto' ? `🌐 ${lang.label}` : `${lang.nativeLabel} (${lang.label})`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <button 
+              onClick={onToggleWorkerMode} 
+              className={`p-2 rounded-lg transition-colors ${isWorkerMode ? 'bg-blue-500 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`} 
+              aria-label="Toggle Worker Mode"
+              title={isWorkerMode ? "Worker Mode Active" : "Switch to Worker Mode"}
+            >
+              <WorkerIcon className="w-4 h-4 sm:w-5 sm:h-5"/>
+            </button>
+            <button 
+              onClick={onLogout} 
+              className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors" 
+              aria-label="Logout"
+              title="Log out"
+            >
+              <LogoutIcon className="w-4 h-4 sm:w-5 sm:h-5"/>
+            </button>
+          </div>
         </div>
       </header>
       

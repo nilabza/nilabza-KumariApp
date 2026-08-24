@@ -118,22 +118,29 @@ async function startServer() {
       const userName = userProfile?.name ? ` User name is ${userProfile.name}.` : '';
 
       const languageInstruction = langCode.startsWith('bn')
-        ? 'MUST respond fully in Bengali (বাংলা). Write naturally using Bengali script.'
+        ? 'CRITICAL MANDATE: You MUST respond entirely in Bengali (বাংলা script). Do NOT respond in English or Hindi.'
         : langCode.startsWith('hi')
-        ? 'MUST respond in Hindi (हिंदी) or natural Hinglish matching the user query.'
+        ? 'CRITICAL MANDATE: You MUST respond in Hindi (हिंदी script) or natural conversational Hinglish matching the user query.'
+        : langCode.startsWith('en')
+        ? 'CRITICAL MANDATE: You MUST respond in English in a clear, compassionate, and conversational tone.'
         : langCode.startsWith('ta')
-        ? 'MUST respond in Tamil (தமிழ்).'
+        ? 'CRITICAL MANDATE: You MUST respond in Tamil (தமிழ் script).'
         : langCode.startsWith('te')
-        ? 'MUST respond in Telugu (తెలుగు).'
+        ? 'CRITICAL MANDATE: You MUST respond in Telugu (తెలుగు script).'
         : langCode.startsWith('kn')
-        ? 'MUST respond in Kannada (ಕನ್ನಡ).'
+        ? 'CRITICAL MANDATE: You MUST respond in Kannada (ಕನ್ನಡ script).'
         : langCode.startsWith('ml')
-        ? 'MUST respond in Malayalam (മലയാളം).'
+        ? 'CRITICAL MANDATE: You MUST respond in Malayalam (മലയാളം script).'
         : langCode.startsWith('mr')
-        ? 'MUST respond in Marathi (मराठी).'
+        ? 'CRITICAL MANDATE: You MUST respond in Marathi (मराठी script).'
         : langCode.startsWith('gu')
-        ? 'MUST respond in Gujarati (ગુજરાતી).'
-        : `MUST respond in language/script code '${langCode}' (or the language/script used by the user in their query).`;
+        ? 'CRITICAL MANDATE: You MUST respond in Gujarati (ગુજરાતી script).'
+        : langCode.startsWith('pa')
+        ? 'CRITICAL MANDATE: You MUST respond in Punjabi (ਪੰਜਾਬੀ script).'
+        : langCode.startsWith('or')
+        ? 'CRITICAL MANDATE: You MUST respond in Odia (ଓଡ଼ିଆ script).'
+        : `CRITICAL MANDATE: You MUST respond in language/script code '${langCode}' (or the language/script used by the user in their query).`;
+
 
       const systemInstruction = `You are KUMARI, a compassionate, friendly, supportive, and culturally sensitive AI health & well-being assistant created specifically for adolescent girls in India${isWorkerMode ? ' and community health workers (ASHA didis)' : ''}.
 ${userName}

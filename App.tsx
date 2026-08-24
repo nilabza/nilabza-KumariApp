@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Message, Role, UserProfile } from './types';
+import { Message, Role, UserProfile, SUPPORTED_LANGUAGES } from './types';
 import { getChatbotResponse, detectLanguage } from './services/geminiService';
 import { retrieveContext as getContextForQuery } from './services/knowledgeBase';
 import { getRandomProbingQuestion } from './services/probingQuestions';
@@ -28,6 +28,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [consent, setConsent] = useState<boolean | null>(null);
   const [isWorkerMode, setIsWorkerMode] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('auto');
   const [callState, setCallState] = useState<CallState>('idle');
   const [latestBotResponse, setLatestBotResponse] = useState({ id: '', content: '', langCode: '' });
   const [isVoiceModeActive, setIsVoiceModeActive] = useState(false);
@@ -37,6 +38,7 @@ const App: React.FC = () => {
   const [currentLangCode, setCurrentLangCode] = useState('en-IN');
   const [isSystemReady, setIsSystemReady] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+
   
   const [inputValue, setInputValue] = useState('');
   const [micError, setMicError] = useState('');
@@ -165,7 +167,11 @@ const App: React.FC = () => {
     };
     setMessages(prev => [...prev, newUserMessage]);
 
-    const langCode = await detectLanguage(trimmedInput);
+    // Use manual language override if set; otherwise auto-detect
+    const langCode = selectedLanguage !== 'auto' 
+      ? selectedLanguage 
+      : await detectLanguage(trimmedInput);
+      
     setCurrentLangCode(langCode);
     const botResponseContent = await getChatbotResponse(trimmedInput, userProfile, langCode, isWorkerMode);
     
@@ -185,9 +191,36 @@ const App: React.FC = () => {
 
     onResponseReady?.(botResponseContent, langCode);
 
-  }, [userProfile, isWorkerMode, isVoiceModeActive, callState, currentLangCode, messages, speak, startListening]);
+  }, [userProfile, isWorkerMode, isVoiceModeActive, callState, currentLangCode, selectedLanguage, messages, speak, startListening]);
+
+  const handleLanguageChange = (newLangCode: string) => {
+    setSelectedLanguage(newLangCode);
+    if (newLangCode !== 'auto') {
+      setCurrentLangCode(newLangCode);
+      const selected = SUPPORTED_LANGUAGES.find(l => l.code === newLangCode);
+      const label = selected ? `${selected.nativeLabel} (${selected.label})` : newLangCode;
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: Role.SYSTEM,
+          content: `Language switched to ${label}. KUMARI will now respond in this language.`,
+        }
+      ]);
+    } else {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: Role.SYSTEM,
+          content: `Language set to Auto-Detect. KUMARI will automatically detect and respond in the language you type or speak.`,
+        }
+      ]);
+    }
+  };
 
   const handleSendMessage = useCallback((userInput: string = '', isFromVoice: boolean = false) => {
+
     const query = userInput.trim();
     if (!query) return;
 
@@ -497,6 +530,8 @@ const App: React.FC = () => {
                 inputValue={inputValue}
                 onInputChange={setInputValue}
                 onLogout={handleLogout}
+                selectedLanguage={selectedLanguage}
+                onLanguageChange={handleLanguageChange}
             />
         </div>
     </div>
